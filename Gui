@@ -4,7 +4,12 @@
     A minimalist gaming menu UI with tab system for Roblox
     
     Author: Claude
-    Version: 1.0
+    Version: 1.1
+    
+    Additions:
+    - Color Picker
+    - Multi-select Dropdown
+    - Nested Dropdowns
 ]]
 
 -- Library Module
@@ -40,6 +45,19 @@ ZyncLib.SoundIDs = {
     NAVIGATION = "rbxassetid://255473262"
 }
 
+-- Color presets for color picker
+ZyncLib.ColorPresets = {
+    {name = "Red", color = Color3.fromRGB(255, 0, 0)},
+    {name = "Green", color = Color3.fromRGB(0, 255, 0)},
+    {name = "Blue", color = Color3.fromRGB(0, 0, 255)},
+    {name = "Yellow", color = Color3.fromRGB(255, 255, 0)},
+    {name = "Cyan", color = Color3.fromRGB(0, 255, 255)},
+    {name = "Magenta", color = Color3.fromRGB(255, 0, 255)},
+    {name = "Black", color = Color3.fromRGB(0, 0, 0)},
+    {name = "White", color = Color3.fromRGB(255, 255, 255)},
+    {name = "Gray", color = Color3.fromRGB(128, 128, 128)}
+}
+
 -----------------------------------------------------------
 -- HELPER CLASSES
 -----------------------------------------------------------
@@ -58,11 +76,20 @@ Button.__index = Button
 local Dropdown = {}
 Dropdown.__index = Dropdown
 
+local MultiDropdown = {}
+MultiDropdown.__index = MultiDropdown
+
+local NestedDropdown = {}
+NestedDropdown.__index = NestedDropdown
+
 local Slider = {}
 Slider.__index = Slider
 
 local Keybind = {}
 Keybind.__index = Keybind
+
+local ColorPicker = {}
+ColorPicker.__index = ColorPicker
 
 -- ScriptManager for toggle scripts
 local ScriptManager = {}
@@ -242,6 +269,32 @@ function Tab:AddDropdown(name, settings)
     return dropdown
 end
 
+-- Add a multi-select dropdown option to the tab
+function Tab:AddMultiDropdown(name, settings)
+    settings = settings or {}
+    local multiDropdown = MultiDropdown.new(name, self, settings)
+    table.insert(self.options, multiDropdown)
+    
+    if self.parent.initialized then
+        self.parent:Render()
+    end
+    
+    return multiDropdown
+end
+
+-- Add a nested dropdown option to the tab
+function Tab:AddNestedDropdown(name, settings)
+    settings = settings or {}
+    local nestedDropdown = NestedDropdown.new(name, self, settings)
+    table.insert(self.options, nestedDropdown)
+    
+    if self.parent.initialized then
+        self.parent:Render()
+    end
+    
+    return nestedDropdown
+end
+
 -- Add a slider option to the tab
 function Tab:AddSlider(name, settings)
     settings = settings or {}
@@ -266,6 +319,19 @@ function Tab:AddKeybind(name, settings)
     end
     
     return keybind
+end
+
+-- Add a color picker option to the tab
+function Tab:AddColorPicker(name, settings)
+    settings = settings or {}
+    local colorPicker = ColorPicker.new(name, self, settings)
+    table.insert(self.options, colorPicker)
+    
+    if self.parent.initialized then
+        self.parent:Render()
+    end
+    
+    return colorPicker
 end
 
 -----------------------------------------------------------
@@ -432,6 +498,143 @@ function Dropdown:SetKeybind(key)
     return self
 end
 
+-- Open dropdown selection menu
+function Dropdown:OpenMenu(position)
+    self.parent.parent:OpenDropdownMenu(self, position)
+    return self
+end
+
+-----------------------------------------------------------
+-- MULTI-SELECT DROPDOWN IMPLEMENTATION
+-----------------------------------------------------------
+
+-- Create a new multi-select dropdown
+function MultiDropdown.new(name, parent, settings)
+    local self = setmetatable({}, MultiDropdown)
+    self.name = name
+    self.parent = parent
+    self.type = "multiDropdown"
+    self.values = settings.values or {"Option 1", "Option 2", "Option 3"}
+    self.selected = settings.default or {}
+    self.keybind = settings.keybind
+    self.callback = settings.callback
+    self.displayFormat = settings.displayFormat or function(selected)
+        if #selected == 0 then
+            return "None"
+        elseif #selected == #self.values then
+            return "All"
+        else
+            return #selected .. " selected"
+        end
+    end
+    return self
+end
+
+-- Toggle a value selection
+function MultiDropdown:ToggleValue(value)
+    -- Check if value exists in selected list
+    local index = nil
+    for i, v in ipairs(self.selected) do
+        if v == value then
+            index = i
+            break
+        end
+    end
+    
+    -- Toggle selection
+    if index then
+        table.remove(self.selected, index)
+    else
+        table.insert(self.selected, value)
+    end
+    
+    -- Call callback
+    if self.callback then
+        self.callback(self.selected)
+    end
+    
+    self.parent.parent:Render()
+    return self
+end
+
+-- Check if a value is selected
+function MultiDropdown:IsSelected(value)
+    for _, v in ipairs(self.selected) do
+        if v == value then
+            return true
+        end
+    end
+    return false
+end
+
+-- Set the keybind
+function MultiDropdown:SetKeybind(key)
+    self.keybind = key
+    self.parent.parent:Render()
+    return self
+end
+
+-- Open multi-select dropdown menu
+function MultiDropdown:OpenMenu(position)
+    self.parent.parent:OpenMultiDropdownMenu(self, position)
+    return self
+end
+
+-----------------------------------------------------------
+-- NESTED DROPDOWN IMPLEMENTATION
+-----------------------------------------------------------
+
+-- Create a new nested dropdown
+function NestedDropdown.new(name, parent, settings)
+    local self = setmetatable({}, NestedDropdown)
+    self.name = name
+    self.parent = parent
+    self.type = "nestedDropdown"
+    
+    -- Format: { {name = "Category1", options = {"Option1", "Option2"}}, ... }
+    self.categories = settings.categories or {
+        {name = "Category 1", options = {"Option 1", "Option 2"}},
+        {name = "Category 2", options = {"Option 3", "Option 4"}}
+    }
+    
+    self.category = settings.defaultCategory or self.categories[1].name
+    self.value = settings.defaultOption or self.categories[1].options[1]
+    self.keybind = settings.keybind
+    self.callback = settings.callback
+    return self
+end
+
+-- Set the dropdown values
+function NestedDropdown:SetValue(category, option)
+    self.category = category
+    self.value = option
+    
+    if self.callback then
+        self.callback(category, option)
+    end
+    
+    self.parent.parent:Render()
+    return self
+end
+
+-- Get display text
+function NestedDropdown:GetDisplayText()
+    return self.category .. " > " .. self.value
+end
+
+-- Set the keybind
+function NestedDropdown:SetKeybind(key)
+    self.keybind = key
+    self.parent.parent:Render()
+    return self
+end
+
+-- Open nested dropdown menu
+function NestedDropdown:OpenMenu(position)
+    self.parent.parent:OpenNestedDropdownMenu(self, position)
+    return self
+end
+
 -----------------------------------------------------------
 -- SLIDER IMPLEMENTATION
 -----------------------------------------------------------
@@ -511,6 +714,79 @@ function Keybind:SetValue(key)
 end
 
 -----------------------------------------------------------
+-- COLOR PICKER IMPLEMENTATION
+-----------------------------------------------------------
+
+-- Create a new color picker option
+function ColorPicker.new(name, parent, settings)
+    local self = setmetatable({}, ColorPicker)
+    self.name = name
+    self.parent = parent
+    self.type = "colorPicker"
+    self.value = settings.default or Color3.fromRGB(255, 255, 255)
+    self.transparency = settings.defaultTransparency or 0
+    self.rainbow = settings.defaultRainbow or false
+    self.callback = settings.callback
+    self.keybind = settings.keybind
+    self.presets = settings.presets or ZyncLib.ColorPresets
+    return self
+end
+
+-- Set the color
+function ColorPicker:SetColor(color, transparency)
+    self.value = color
+    
+    if transparency ~= nil then
+        self.transparency = math.clamp(transparency, 0, 1)
+    end
+    
+    if self.callback then
+        self.callback(color, self.transparency)
+    end
+    
+    self.parent.parent:Render()
+    return self
+end
+
+-- Toggle rainbow mode
+function ColorPicker:ToggleRainbow()
+    self.rainbow = not self.rainbow
+    
+    -- Start or stop rainbow effect
+    if self.rainbow then
+        -- Start rainbow cycle
+        if not self.rainbowConnection then
+            self.rainbowConnection = RunService.RenderStepped:Connect(function(dt)
+                local h, s, v = self.value:ToHSV()
+                h = (h + dt * 0.1) % 1
+                self:SetColor(Color3.fromHSV(h, s, v))
+            end)
+        end
+    else
+        -- Stop rainbow cycle
+        if self.rainbowConnection then
+            self.rainbowConnection:Disconnect()
+            self.rainbowConnection = nil
+        end
+    end
+    
+    return self
+end
+
+-- Open color picker menu
+function ColorPicker:OpenPicker(position)
+    self.parent.parent:OpenColorPicker(self, position)
+    return self
+end
+
+-- Set the keybind
+function ColorPicker:SetKeybind(key)
+    self.keybind = key
+    self.parent.parent:Render()
+    return self
+end
+
+-----------------------------------------------------------
 -- ZYNCLIB IMPLEMENTATION
 -----------------------------------------------------------
 
@@ -540,6 +816,9 @@ function ZyncLib.new(title, settings)
         dragOffset = nil,
         keybindOpen = false,
         dropdownOpen = false,
+        currentDropdown = nil,
+        colorPickerOpen = false,
+        currentColorPicker = nil,
         lastHoveredElement = nil
     }
     
@@ -687,7 +966,7 @@ function ZyncLib:CreateUI()
     self.dropdownContainer.BackgroundColor3 = ZyncLib.Constants.DROPDOWN_BG
     self.dropdownContainer.BorderSizePixel = 0
     self.dropdownContainer.Position = UDim2.new(0, 0, 0, 0)
-    self.dropdownContainer.Size = UDim2.new(0, 120, 0, 100)
+    self.dropdownContainer.Size = UDim2.new(0, 150, 0, 100)
     self.dropdownContainer.Visible = false
     self.dropdownContainer.ZIndex = 1100
     self.dropdownContainer.Parent = self.screenGui
@@ -702,6 +981,17 @@ function ZyncLib:CreateUI()
     self.keybindDropdown.Visible = false
     self.keybindDropdown.ZIndex = 1100
     self.keybindDropdown.Parent = self.screenGui
+    
+    -- Create color picker container (initially hidden)
+    self.colorPickerContainer = Instance.new("Frame")
+    self.colorPickerContainer.Name = "ColorPickerContainer"
+    self.colorPickerContainer.BackgroundColor3 = ZyncLib.Constants.DROPDOWN_BG
+    self.colorPickerContainer.BorderSizePixel = 0
+    self.colorPickerContainer.Position = UDim2.new(0, 0, 0, 0)
+    self.colorPickerContainer.Size = UDim2.new(0, 200, 0, 220)
+    self.colorPickerContainer.Visible = false
+    self.colorPickerContainer.ZIndex = 1100
+    self.colorPickerContainer.Parent = self.screenGui
 end
 
 -- Set up sound system
@@ -852,6 +1142,8 @@ function ZyncLib:SetupInputHandlers()
                             option:Click()
                         elseif option.type == "slider" then
                             option:Increment()
+                        elseif option.type == "colorPicker" then
+                            option:OpenPicker()
                         end
                     end
                 end
@@ -870,6 +1162,30 @@ function ZyncLib:SetupInputHandlers()
             else
                 -- Scroll down
                 self:Navigate(1)
+            end
+        end
+    end)
+    
+    -- Close dropdowns on mouse click outside
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            -- Check if click is outside dropdown
+            if self.state.dropdownOpen or self.state.keybindOpen or self.state.colorPickerOpen then
+                local dropdownFrame = self.state.dropdownOpen and self.dropdownContainer or
+                                      self.state.keybindOpen and self.keybindDropdown or
+                                      self.colorPickerContainer
+                
+                local mouse = UserInputService:GetMouseLocation()
+                local dropdownPos = dropdownFrame.AbsolutePosition
+                local dropdownSize = dropdownFrame.AbsoluteSize
+                
+                -- Check if click is outside dropdown
+                if mouse.X < dropdownPos.X or 
+                   mouse.X > dropdownPos.X + dropdownSize.X or
+                   mouse.Y < dropdownPos.Y or
+                   mouse.Y > dropdownPos.Y + dropdownSize.Y then
+                    self:CloseAllDropdowns()
+                end
             end
         end
     end)
@@ -938,6 +1254,14 @@ function ZyncLib:CloseAllDropdowns()
     if self.state.dropdownOpen then
         self.dropdownContainer.Visible = false
         self.state.dropdownOpen = false
+        self.state.currentDropdown = nil
+    end
+    
+    -- Close color picker if open
+    if self.state.colorPickerOpen then
+        self.colorPickerContainer.Visible = false
+        self.state.colorPickerOpen = false
+        self.state.currentColorPicker = nil
     end
 end
 
@@ -1033,6 +1357,37 @@ function ZyncLib:HandleSelect()
             option:Click()
         elseif option.type == "slider" then
             option:Increment()
+        elseif option.type == "colorPicker" then
+            option:OpenPicker()
+        elseif option.type == "multiDropdown" or option.type == "nestedDropdown" then
+            self:HandleDropdownSelect(option)
+        end
+    end
+end
+
+-- Handle dropdown selection
+function ZyncLib:HandleDropdownSelect(dropdown)
+    local optionFrame = nil
+    
+    -- Find the option frame
+    for _, item in ipairs(self.menuItems) do
+        if item.option == dropdown then
+            optionFrame = item.instance
+            break
+        end
+    end
+    
+    if optionFrame then
+        local absPos = optionFrame.AbsolutePosition
+        local absSize = optionFrame.AbsoluteSize
+        local position = UDim2.new(0, absPos.X + absSize.X, 0, absPos.Y)
+        
+        if dropdown.type == "dropdown" then
+            self:OpenDropdownMenu(dropdown, position)
+        elseif dropdown.type == "multiDropdown" then
+            self:OpenMultiDropdownMenu(dropdown, position)
+        elseif dropdown.type == "nestedDropdown" then
+            self:OpenNestedDropdownMenu(dropdown, position)
         end
     end
 end
@@ -1044,7 +1399,15 @@ function ZyncLib:OpenKeybindDropdown(tabIndex, optionIndex)
     
     -- Get option and position
     local option = self.tabs[tabIndex].options[optionIndex]
-    local optionFrame = self.menuContainer:FindFirstChild("OptionFrame_" .. tabIndex .. "_" .. optionIndex)
+    local optionFrame = nil
+    
+    -- Find the option frame
+    for _, item in ipairs(self.menuItems) do
+        if item.tabIndex == tabIndex and item.optionIndex == optionIndex then
+            optionFrame = item.instance
+            break
+        end
+    end
     
     if not optionFrame then return end
     
@@ -1136,12 +1499,971 @@ function ZyncLib:OpenKeybindDropdown(tabIndex, optionIndex)
     self.state.keybindOpen = true
 end
 
+-- Open dropdown menu
+function ZyncLib:OpenDropdownMenu(dropdown, position)
+    -- Close any open dropdowns
+    self:CloseAllDropdowns()
+    
+    -- Clear dropdown container
+    for _, child in pairs(self.dropdownContainer:GetChildren()) do
+        child:Destroy()
+    end
+    
+    -- Create dropdown title
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    title.BorderSizePixel = 0
+    title.Size = UDim2.new(1, 0, 0, 20)
+    title.Font = Enum.Font.RobotoMono
+    title.Text = dropdown.name
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextSize = 14
+    title.ZIndex = 1101
+    title.Parent = self.dropdownContainer
+    
+    -- Create dropdown options container
+    local listFrame = Instance.new("Frame")
+    listFrame.Name = "ListFrame"
+    listFrame.BackgroundTransparency = 1
+    listFrame.Position = UDim2.new(0, 0, 0, 20)
+    listFrame.Size = UDim2.new(1, 0, 1, -20)
+    listFrame.ZIndex = 1101
+    listFrame.Parent = self.dropdownContainer
+    
+    -- Add dropdown options
+    local maxWidth = 150
+    for i, value in ipairs(dropdown.values) do
+        local item = Instance.new("TextButton")
+        item.Name = "Option_" .. i
+        item.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        item.BorderSizePixel = 0
+        item.Position = UDim2.new(0, 0, 0, (i-1) * 20)
+        item.Size = UDim2.new(1, 0, 0, 20)
+        item.Font = Enum.Font.RobotoMono
+        item.Text = value
+        item.TextColor3 = Color3.fromRGB(255, 255, 255)
+        item.TextSize = 14
+        item.TextXAlignment = Enum.TextXAlignment.Left
+        item.ZIndex = 1101
+        
+        -- Highlight current value
+        if dropdown.value == value then
+            item.BackgroundColor3 = ZyncLib.Constants.HIGHLIGHT_COLOR
+        end
+        
+        -- Selection handling
+        item.MouseButton1Click:Connect(function()
+            dropdown:SetValue(value)
+            self:PlaySound("click")
+            self.dropdownContainer.Visible = false
+            self.state.dropdownOpen = false
+            self.state.currentDropdown = nil
+            self:Render()
+        end)
+        
+        -- Hover effect
+        item.MouseEnter:Connect(function()
+            if self.state.lastHoveredElement ~= item then
+                self:PlaySound("hover")
+                self.state.lastHoveredElement = item
+                
+                -- Highlight on hover
+                if dropdown.value ~= value then
+                    item.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                end
+            end
+        end)
+        
+        item.MouseLeave:Connect(function()
+            -- Reset background when not hovering
+            if dropdown.value ~= value then
+                item.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            end
+        end)
+        
+        item.Parent = listFrame
+        
+        -- Calculate required width based on text
+        local textWidth = item.TextBounds.X + 20
+        maxWidth = math.max(maxWidth, textWidth)
+    end
+    
+    -- Set size and position
+    self.dropdownContainer.Size = UDim2.new(0, maxWidth, 0, 20 + (#dropdown.values * 20))
+    self.dropdownContainer.Position = position
+    self.dropdownContainer.Visible = true
+    self.state.dropdownOpen = true
+    self.state.currentDropdown = dropdown
+end
+
+-- Open multi-select dropdown menu
+function ZyncLib:OpenMultiDropdownMenu(dropdown, position)
+    -- Close any open dropdowns
+    self:CloseAllDropdowns()
+    
+    -- Clear dropdown container
+    for _, child in pairs(self.dropdownContainer:GetChildren()) do
+        child:Destroy()
+    end
+    
+    -- Create dropdown title
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    title.BorderSizePixel = 0
+    title.Size = UDim2.new(1, 0, 0, 20)
+    title.Font = Enum.Font.RobotoMono
+    title.Text = dropdown.name
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextSize = 14
+    title.ZIndex = 1101
+    title.Parent = self.dropdownContainer
+    
+    -- Create dropdown options container
+    local listFrame = Instance.new("Frame")
+    listFrame.Name = "ListFrame"
+    listFrame.BackgroundTransparency = 1
+    listFrame.Position = UDim2.new(0, 0, 0, 20)
+    listFrame.Size = UDim2.new(1, 0, 1, -20)
+    listFrame.ZIndex = 1101
+    listFrame.Parent = self.dropdownContainer
+    
+    -- Add dropdown options
+    local maxWidth = 150
+    for i, value in ipairs(dropdown.values) do
+        local item = Instance.new("TextButton")
+        item.Name = "Option_" .. i
+        item.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        item.BorderSizePixel = 0
+        item.Position = UDim2.new(0, 0, 0, (i-1) * 20)
+        item.Size = UDim2.new(1, 0, 0, 20)
+        item.Font = Enum.Font.RobotoMono
+        item.TextColor3 = Color3.fromRGB(255, 255, 255)
+        item.TextSize = 14
+        item.TextXAlignment = Enum.TextXAlignment.Left
+        item.ZIndex = 1101
+        
+        -- Create checkbox for multi-select
+        local checkbox = Instance.new("Frame")
+        checkbox.Name = "Checkbox"
+        checkbox.Size = UDim2.new(0, 14, 0, 14)
+        checkbox.Position = UDim2.new(0, 3, 0.5, -7)
+        checkbox.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+        checkbox.BorderColor3 = Color3.fromRGB(100, 100, 100)
+        checkbox.ZIndex = 1102
+        checkbox.Parent = item
+        
+        -- Check mark for selected items
+        if dropdown:IsSelected(value) then
+            local checkmark = Instance.new("TextLabel")
+            checkmark.Name = "Checkmark"
+            checkmark.Size = UDim2.new(1, 0, 1, 0)
+            checkmark.BackgroundTransparency = 1
+            checkmark.Text = "✓"
+            checkmark.Font = Enum.Font.SourceSans
+            checkmark.TextColor3 = Color3.fromRGB(255, 255, 255)
+            checkmark.TextSize = 12
+            checkmark.ZIndex = 1103
+            checkmark.Parent = checkbox
+            
+            -- Highlight background
+            item.BackgroundColor3 = Color3.fromRGB(60, 60, 100)
+        end
+        
+        -- Add value label
+        local valueLabel = Instance.new("TextLabel")
+        valueLabel.Name = "ValueLabel"
+        valueLabel.Size = UDim2.new(1, -25, 1, 0)
+        valueLabel.Position = UDim2.new(0, 22, 0, 0)
+        valueLabel.BackgroundTransparency = 1
+        valueLabel.Font = Enum.Font.RobotoMono
+        valueLabel.Text = value
+        valueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        valueLabel.TextSize = 14
+        valueLabel.TextXAlignment = Enum.TextXAlignment.Left
+        valueLabel.ZIndex = 1102
+        valueLabel.Parent = item
+        
+        -- Selection handling
+        item.MouseButton1Click:Connect(function()
+            dropdown:ToggleValue(value)
+            self:PlaySound("click")
+            
+            -- Don't close dropdown after selection, just update
+            self:OpenMultiDropdownMenu(dropdown, position)
+        end)
+        
+        -- Hover effect
+        item.MouseEnter:Connect(function()
+            if self.state.lastHoveredElement ~= item then
+                self:PlaySound("hover")
+                self.state.lastHoveredElement = item
+                
+                -- Highlight on hover
+                if not dropdown:IsSelected(value) then
+                    item.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                end
+            end
+        end)
+        
+        item.MouseLeave:Connect(function()
+            -- Reset background when not hovering
+            if not dropdown:IsSelected(value) then
+                item.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            end
+        end)
+        
+        item.Parent = listFrame
+        
+        -- Calculate required width based on text
+        local textWidth = valueLabel.TextBounds.X + 40
+        maxWidth = math.max(maxWidth, textWidth)
+    end
+    
+    -- Add confirm button
+    local confirmButton = Instance.new("TextButton")
+    confirmButton.Name = "ConfirmButton"
+    confirmButton.BackgroundColor3 = ZyncLib.Constants.HIGHLIGHT_COLOR
+    confirmButton.BorderSizePixel = 0
+    confirmButton.Position = UDim2.new(0, 0, 0, (#dropdown.values * 20))
+    confirmButton.Size = UDim2.new(1, 0, 0, 25)
+    confirmButton.Font = Enum.Font.RobotoMono
+    confirmButton.Text = "Confirm"
+    confirmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    confirmButton.TextSize = 14
+    confirmButton.ZIndex = 1101
+    confirmButton.Parent = listFrame
+    
+    -- Confirm button handling
+    confirmButton.MouseButton1Click:Connect(function()
+        self:PlaySound("click")
+        self.dropdownContainer.Visible = false
+        self.state.dropdownOpen = false
+        self.state.currentDropdown = nil
+        self:Render()
+    end)
+    
+    -- Set size and position
+    self.dropdownContainer.Size = UDim2.new(0, maxWidth, 0, 20 + (#dropdown.values * 20) + 25)
+    self.dropdownContainer.Position = position
+    self.dropdownContainer.Visible = true
+    self.state.dropdownOpen = true
+    self.state.currentDropdown = dropdown
+end
+
+-- Open nested dropdown menu
+function ZyncLib:OpenNestedDropdownMenu(dropdown, position)
+    -- Close any open dropdowns
+    self:CloseAllDropdowns()
+    
+    -- Clear dropdown container
+    for _, child in pairs(self.dropdownContainer:GetChildren()) do
+        child:Destroy()
+    end
+    
+    -- Create dropdown title
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    title.BorderSizePixel = 0
+    title.Size = UDim2.new(1, 0, 0, 20)
+    title.Font = Enum.Font.RobotoMono
+    title.Text = dropdown.name
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextSize = 14
+    title.ZIndex = 1101
+    title.Parent = self.dropdownContainer
+    
+    -- Create categories container
+    local categoriesFrame = Instance.new("Frame")
+    categoriesFrame.Name = "CategoriesFrame"
+    categoriesFrame.BackgroundTransparency = 1
+    categoriesFrame.Position = UDim2.new(0, 0, 0, 20)
+    categoriesFrame.Size = UDim2.new(0.4, 0, 1, -20)
+    categoriesFrame.ZIndex = 1101
+    categoriesFrame.Parent = self.dropdownContainer
+    
+    -- Create options container
+    local optionsFrame = Instance.new("Frame")
+    optionsFrame.Name = "OptionsFrame"
+    optionsFrame.BackgroundTransparency = 1
+    optionsFrame.Position = UDim2.new(0.4, 0, 0, 20)
+    optionsFrame.Size = UDim2.new(0.6, 0, 1, -20)
+    optionsFrame.ZIndex = 1101
+    optionsFrame.Parent = self.dropdownContainer
+    
+    -- Add separator line
+    local separator = Instance.new("Frame")
+    separator.Name = "Separator"
+    separator.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    separator.BorderSizePixel = 0
+    separator.Position = UDim2.new(0.4, 0, 0, 20)
+    separator.Size = UDim2.new(0, 1, 1, -20)
+    separator.ZIndex = 1102
+    separator.Parent = self.dropdownContainer
+    
+    -- Selected category
+    local selectedCategory = dropdown.category
+    
+    -- Add categories
+    local maxCategoryWidth = 0
+    local maxOptionWidth = 0
+    local maxHeight = 0
+    
+    for i, category in ipairs(dropdown.categories) do
+        local categoryBtn = Instance.new("TextButton")
+        categoryBtn.Name = "Category_" .. i
+        categoryBtn.BackgroundColor3 = category.name == selectedCategory 
+            and ZyncLib.Constants.HIGHLIGHT_COLOR 
+            or Color3.fromRGB(40, 40, 40)
+        categoryBtn.BorderSizePixel = 0
+        categoryBtn.Position = UDim2.new(0, 0, 0, (i-1) * 20)
+        categoryBtn.Size = UDim2.new(1, 0, 0, 20)
+        categoryBtn.Font = Enum.Font.RobotoMono
+        categoryBtn.Text = category.name
+        categoryBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        categoryBtn.TextSize = 14
+        categoryBtn.TextXAlignment = Enum.TextXAlignment.Left
+        categoryBtn.ZIndex = 1102
+        categoryBtn.Parent = categoriesFrame
+        
+        -- Category selection handling
+        categoryBtn.MouseButton1Click:Connect(function()
+            selectedCategory = category.name
+            
+            -- Update UI
+            for _, child in pairs(categoriesFrame:GetChildren()) do
+                if child:IsA("TextButton") then
+                    child.BackgroundColor3 = child.Text == selectedCategory 
+                        and ZyncLib.Constants.HIGHLIGHT_COLOR 
+                        or Color3.fromRGB(40, 40, 40)
+                end
+            end
+            
+            -- Update options
+            self:UpdateNestedDropdownOptions(dropdown, optionsFrame, selectedCategory)
+            
+            self:PlaySound("click")
+        end)
+        
+        -- Hover effect
+        categoryBtn.MouseEnter:Connect(function()
+            if self.state.lastHoveredElement ~= categoryBtn then
+                self:PlaySound("hover")
+                self.state.lastHoveredElement = categoryBtn
+                
+                -- Highlight on hover
+                if category.name ~= selectedCategory then
+                    categoryBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                end
+            end
+        end)
+        
+        categoryBtn.MouseLeave:Connect(function()
+            -- Reset background when not hovering
+            if category.name ~= selectedCategory then
+                categoryBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            end
+        end)
+        
+        -- Calculate required width and height
+        maxCategoryWidth = math.max(maxCategoryWidth, categoryBtn.TextBounds.X + 20)
+        maxHeight = math.max(maxHeight, i * 20)
+    end
+    
+    -- Populate options for the selected category
+    self:UpdateNestedDropdownOptions(dropdown, optionsFrame, selectedCategory)
+    
+    -- Calculate max option width
+    for _, category in ipairs(dropdown.categories) do
+        for _, option in ipairs(category.options) do
+            local textBounds = game:GetService("TextService"):GetTextSize(
+                option, 
+                14, 
+                Enum.Font.RobotoMono, 
+                Vector2.new(999, 20)
+            )
+            maxOptionWidth = math.max(maxOptionWidth, textBounds.X + 20)
+        end
+    end
+    
+    -- Set size and position
+    local totalWidth = maxCategoryWidth + maxOptionWidth + 10 -- +10 for separator
+    local totalHeight = math.max(maxHeight, 100) + 20 -- +20 for title
+    
+    self.dropdownContainer.Size = UDim2.new(0, totalWidth, 0, totalHeight)
+    self.dropdownContainer.Position = position
+    self.dropdownContainer.Visible = true
+    self.state.dropdownOpen = true
+    self.state.currentDropdown = dropdown
+end
+
+-- Update options in nested dropdown
+function ZyncLib:UpdateNestedDropdownOptions(dropdown, optionsFrame, categoryName)
+    -- Clear options
+    for _, child in pairs(optionsFrame:GetChildren()) do
+        child:Destroy()
+    end
+    
+    -- Find the category
+    local category = nil
+    for _, cat in ipairs(dropdown.categories) do
+        if cat.name == categoryName then
+            category = cat
+            break
+        end
+    end
+    
+    if not category then return end
+    
+    -- Add options
+    for i, option in ipairs(category.options) do
+        local optionBtn = Instance.new("TextButton")
+        optionBtn.Name = "Option_" .. i
+        optionBtn.BackgroundColor3 = (dropdown.category == categoryName and dropdown.value == option)
+            and ZyncLib.Constants.HIGHLIGHT_COLOR 
+            or Color3.fromRGB(40, 40, 40)
+        optionBtn.BorderSizePixel = 0
+        optionBtn.Position = UDim2.new(0, 0, 0, (i-1) * 20)
+        optionBtn.Size = UDim2.new(1, 0, 0, 20)
+        optionBtn.Font = Enum.Font.RobotoMono
+        optionBtn.Text = option
+        optionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        optionBtn.TextSize = 14
+        optionBtn.TextXAlignment = Enum.TextXAlignment.Left
+        optionBtn.ZIndex = 1102
+        optionBtn.Parent = optionsFrame
+        
+        -- Option selection handling
+        optionBtn.MouseButton1Click:Connect(function()
+            dropdown:SetValue(categoryName, option)
+            self:PlaySound("click")
+            self.dropdownContainer.Visible = false
+            self.state.dropdownOpen = false
+            self.state.currentDropdown = nil
+            self:Render()
+        end)
+        
+        -- Hover effect
+        optionBtn.MouseEnter:Connect(function()
+            if self.state.lastHoveredElement ~= optionBtn then
+                self:PlaySound("hover")
+                self.state.lastHoveredElement = optionBtn
+                
+                -- Highlight on hover
+                if not (dropdown.category == categoryName and dropdown.value == option) then
+                    optionBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                end
+            end
+        end)
+        
+        optionBtn.MouseLeave:Connect(function()
+            -- Reset background when not hovering
+            if not (dropdown.category == categoryName and dropdown.value == option) then
+                optionBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            end
+        end)
+    end
+end
+
+-- Open color picker
+function ZyncLib:OpenColorPicker(colorPicker, position)
+    -- Close any open dropdowns
+    self:CloseAllDropdowns()
+    
+    -- Clear color picker container
+    for _, child in pairs(self.colorPickerContainer:GetChildren()) do
+        child:Destroy()
+    end
+    
+    -- Create color picker title
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    title.BorderSizePixel = 0
+    title.Size = UDim2.new(1, 0, 0, 20)
+    title.Font = Enum.Font.RobotoMono
+    title.Text = colorPicker.name
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextSize = 14
+    title.ZIndex = 1101
+    title.Parent = self.colorPickerContainer
+    
+    -- Create color display
+    local colorDisplay = Instance.new("Frame")
+    colorDisplay.Name = "ColorDisplay"
+    colorDisplay.BackgroundColor3 = colorPicker.value
+    colorDisplay.BackgroundTransparency = colorPicker.transparency
+    colorDisplay.BorderSizePixel = 1
+    colorDisplay.BorderColor3 = Color3.fromRGB(100, 100, 100)
+    colorDisplay.Position = UDim2.new(0, 10, 0, 30)
+    colorDisplay.Size = UDim2.new(0, 180, 0, 30)
+    colorDisplay.ZIndex = 1102
+    colorDisplay.Parent = self.colorPickerContainer
+    
+    -- Create RGB sliders
+    local sliderContainer = Instance.new("Frame")
+    sliderContainer.Name = "SliderContainer"
+    sliderContainer.BackgroundTransparency = 1
+    sliderContainer.Position = UDim2.new(0, 10, 0, 70)
+    sliderContainer.Size = UDim2.new(0, 180, 0, 90)
+    sliderContainer.ZIndex = 1102
+    sliderContainer.Parent = self.colorPickerContainer
+    
+    -- Create RGB sliders
+    local r, g, b = colorPicker.value.R * 255, colorPicker.value.G * 255, colorPicker.value.B * 255
+    
+    -- Function to create color slider
+    local function createColorSlider(name, value, color, yPos)
+        local sliderFrame = Instance.new("Frame")
+        sliderFrame.Name = name .. "Slider"
+        sliderFrame.BackgroundTransparency = 1
+        sliderFrame.Position = UDim2.new(0, 0, 0, yPos)
+        sliderFrame.Size = UDim2.new(1, 0, 0, 20)
+        sliderFrame.ZIndex = 1103
+        sliderFrame.Parent = sliderContainer
+        
+        -- Label
+        local label = Instance.new("TextLabel")
+        label.Name = "Label"
+        label.BackgroundTransparency = 1
+        label.Position = UDim2.new(0, 0, 0, 0)
+        label.Size = UDim2.new(0, 20, 1, 0)
+        label.Font = Enum.Font.RobotoMono
+        label.Text = name
+        label.TextColor3 = color
+        label.TextSize = 14
+        label.ZIndex = 1104
+        label.Parent = sliderFrame
+        
+        -- Slider background
+        local sliderBg = Instance.new("Frame")
+        sliderBg.Name = "SliderBg"
+        sliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        sliderBg.BorderSizePixel = 0
+        sliderBg.Position = UDim2.new(0, 25, 0.5, -2)
+        sliderBg.Size = UDim2.new(0, 100, 0, 4)
+        sliderBg.ZIndex = 1104
+        sliderBg.Parent = sliderFrame
+        
+        -- Slider fill
+        local sliderFill = Instance.new("Frame")
+        sliderFill.Name = "SliderFill"
+        sliderFill.BackgroundColor3 = color
+        sliderFill.BorderSizePixel = 0
+        sliderFill.Position = UDim2.new(0, 0, 0, 0)
+        sliderFill.Size = UDim2.new(value / 255, 0, 1, 0)
+        sliderFill.ZIndex = 1105
+        sliderFill.Parent = sliderBg
+        
+        -- Value display
+        local valueDisplay = Instance.new("TextBox")
+        valueDisplay.Name = "ValueDisplay"
+        valueDisplay.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        valueDisplay.BorderSizePixel = 1
+        valueDisplay.Position = UDim2.new(0, 130, 0, 0)
+        valueDisplay.Size = UDim2.new(0, 50, 1, 0)
+        valueDisplay.Font = Enum.Font.RobotoMono
+        valueDisplay.Text = tostring(math.floor(value))
+        valueDisplay.TextColor3 = Color3.fromRGB(255, 255, 255)
+        valueDisplay.TextSize = 14
+        valueDisplay.ZIndex = 1104
+        valueDisplay.Parent = sliderFrame
+        valueDisplay.ClearTextOnFocus = true
+        
+        -- Slider interaction
+        sliderBg.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                local mousePos = UserInputService:GetMouseLocation()
+                local sliderPos = sliderBg.AbsolutePosition
+                local sliderSize = sliderBg.AbsoluteSize
+                
+                local relativeX = math.clamp((mousePos.X - sliderPos.X) / sliderSize.X, 0, 1)
+                local newValue = math.floor(relativeX * 255)
+                
+                -- Update slider fill
+                sliderFill.Size = UDim2.new(relativeX, 0, 1, 0)
+                
+                -- Update value display
+                valueDisplay.Text = tostring(newValue)
+                
+                -- Update color
+                if name == "R" then r = newValue
+                elseif name == "G" then g = newValue
+                elseif name == "B" then b = newValue end
+                
+                -- Update color display
+                colorDisplay.BackgroundColor3 = Color3.fromRGB(r, g, b)
+            end
+        end)
+        
+        sliderBg.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                local mousePos = UserInputService:GetMouseLocation()
+                local sliderPos = sliderBg.AbsolutePosition
+                local sliderSize = sliderBg.AbsoluteSize
+                
+                local relativeX = math.clamp((mousePos.X - sliderPos.X) / sliderSize.X, 0, 1)
+                local newValue = math.floor(relativeX * 255)
+                
+                -- Update slider fill
+                sliderFill.Size = UDim2.new(relativeX, 0, 1, 0)
+                
+                -- Update value display
+                valueDisplay.Text = tostring(newValue)
+                
+                -- Update color
+                if name == "R" then r = newValue
+                elseif name == "G" then g = newValue
+                elseif name == "B" then b = newValue end
+                
+                -- Update color display
+                colorDisplay.BackgroundColor3 = Color3.fromRGB(r, g, b)
+            end
+        end)
+        
+        -- Value input handling
+        valueDisplay.FocusLost:Connect(function(enterPressed)
+            if enterPressed then
+                local newValue = tonumber(valueDisplay.Text)
+                if newValue then
+                    newValue = math.clamp(math.floor(newValue), 0, 255)
+                    
+                    -- Update value display
+                    valueDisplay.Text = tostring(newValue)
+                    
+                    -- Update slider fill
+                    sliderFill.Size = UDim2.new(newValue / 255, 0, 1, 0)
+                    
+                    -- Update color
+                    if name == "R" then r = newValue
+                    elseif name == "G" then g = newValue
+                    elseif name == "B" then b = newValue end
+                    
+                    -- Update color display
+                    colorDisplay.BackgroundColor3 = Color3.fromRGB(r, g, b)
+                else
+                    -- Reset to current value
+                    valueDisplay.Text = tostring(math.floor(value))
+                end
+            end
+        end)
+        
+        return sliderFrame
+    end
+    
+    -- Create RGB sliders
+    createColorSlider("R", r, Color3.fromRGB(255, 0, 0), 0)
+    createColorSlider("G", g, Color3.fromRGB(0, 255, 0), 25)
+    createColorSlider("B", b, Color3.fromRGB(0, 0, 255), 50)
+    
+    -- Create transparency slider
+    local transparencySlider = Instance.new("Frame")
+    transparencySlider.Name = "TransparencySlider"
+    transparencySlider.BackgroundTransparency = 1
+    transparencySlider.Position = UDim2.new(0, 10, 0, 165)
+    transparencySlider.Size = UDim2.new(0, 180, 0, 20)
+    transparencySlider.ZIndex = 1103
+    transparencySlider.Parent = self.colorPickerContainer
+    
+    -- Transparency label
+    local transLabel = Instance.new("TextLabel")
+    transLabel.Name = "TransLabel"
+    transLabel.BackgroundTransparency = 1
+    transLabel.Position = UDim2.new(0, 0, 0, 0)
+    transLabel.Size = UDim2.new(0, 25, 1, 0)
+    transLabel.Font = Enum.Font.RobotoMono
+    transLabel.Text = "T:"
+    transLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    transLabel.TextSize = 14
+    transLabel.ZIndex = 1104
+    transLabel.Parent = transparencySlider
+    
+    -- Transparency slider background
+    local transBg = Instance.new("Frame")
+    transBg.Name = "TransBg"
+    transBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    transBg.BorderSizePixel = 0
+    transBg.Position = UDim2.new(0, 30, 0.5, -2)
+    transBg.Size = UDim2.new(0, 100, 0, 4)
+    transBg.ZIndex = 1104
+    transBg.Parent = transparencySlider
+    
+    -- Transparency slider fill
+    local transFill = Instance.new("Frame")
+    transFill.Name = "TransFill"
+    transFill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    transFill.BorderSizePixel = 0
+    transFill.Position = UDim2.new(0, 0, 0, 0)
+    transFill.Size = UDim2.new(1 - colorPicker.transparency, 0, 1, 0)
+    transFill.ZIndex = 1105
+    transFill.Parent = transBg
+    
+    -- Transparency value display
+    local transDisplay = Instance.new("TextBox")
+    transDisplay.Name = "TransDisplay"
+    transDisplay.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    transDisplay.BorderSizePixel = 1
+    transDisplay.Position = UDim2.new(0, 135, 0, 0)
+    transDisplay.Size = UDim2.new(0, 45, 1, 0)
+    transDisplay.Font = Enum.Font.RobotoMono
+    transDisplay.Text = tostring(math.floor((1 - colorPicker.transparency) * 100)) .. "%"
+    transDisplay.TextColor3 = Color3.fromRGB(255, 255, 255)
+    transDisplay.TextSize = 14
+    transDisplay.ZIndex = 1104
+    transDisplay.Parent = transparencySlider
+    
+    -- Transparency slider interaction
+    transBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local mousePos = UserInputService:GetMouseLocation()
+            local sliderPos = transBg.AbsolutePosition
+            local sliderSize = transBg.AbsoluteSize
+            
+            local relativeX = math.clamp((mousePos.X - sliderPos.X) / sliderSize.X, 0, 1)
+            
+            -- Update slider fill
+            transFill.Size = UDim2.new(relativeX, 0, 1, 0)
+            
+            -- Update transparency
+            colorDisplay.BackgroundTransparency = 1 - relativeX
+            
+            -- Update value display
+            transDisplay.Text = tostring(math.floor(relativeX * 100)) .. "%"
+        end
+    end)
+    
+    transBg.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+            local mousePos = UserInputService:GetMouseLocation()
+            local sliderPos = transBg.AbsolutePosition
+            local sliderSize = transBg.AbsoluteSize
+            
+            local relativeX = math.clamp((mousePos.X - sliderPos.X) / sliderSize.X, 0, 1)
+            
+            -- Update slider fill
+            transFill.Size = UDim2.new(relativeX, 0, 1, 0)
+            
+            -- Update transparency
+            colorDisplay.BackgroundTransparency = 1 - relativeX
+            
+            -- Update value display
+            transDisplay.Text = tostring(math.floor(relativeX * 100)) .. "%"
+        end
+    end)
+    
+    -- Create rainbow mode toggle
+    local rainbowToggle = Instance.new("Frame")
+    rainbowToggle.Name = "RainbowToggle"
+    rainbowToggle.BackgroundTransparency = 1
+    rainbowToggle.Position = UDim2.new(0, 10, 0, 190)
+    rainbowToggle.Size = UDim2.new(0, 180, 0, 20)
+    rainbowToggle.ZIndex = 1103
+    rainbowToggle.Parent = self.colorPickerContainer
+    
+    -- Rainbow label
+    local rainbowLabel = Instance.new("TextLabel")
+    rainbowLabel.Name = "RainbowLabel"
+    rainbowLabel.BackgroundTransparency = 1
+    rainbowLabel.Position = UDim2.new(0, 0, 0, 0)
+    rainbowLabel.Size = UDim2.new(0, 120, 1, 0)
+    rainbowLabel.Font = Enum.Font.RobotoMono
+    rainbowLabel.Text = "Rainbow Effect"
+    rainbowLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    rainbowLabel.TextSize = 14
+    rainbowLabel.TextXAlignment = Enum.TextXAlignment.Left
+    rainbowLabel.ZIndex = 1104
+    rainbowLabel.Parent = rainbowToggle
+    
+    -- Rainbow toggle button
+    local rainbowButton = Instance.new("TextButton")
+    rainbowButton.Name = "RainbowButton"
+    rainbowButton.BackgroundColor3 = colorPicker.rainbow and 
+        ZyncLib.Constants.HIGHLIGHT_COLOR or 
+        Color3.fromRGB(60, 60, 60)
+    rainbowButton.BorderSizePixel = 1
+    rainbowButton.Position = UDim2.new(0, 130, 0, 0)
+    rainbowButton.Size = UDim2.new(0, 50, 1, 0)
+    rainbowButton.Font = Enum.Font.RobotoMono
+    rainbowButton.Text = colorPicker.rainbow and "ON" or "OFF"
+    rainbowButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    rainbowButton.TextSize = 14
+    rainbowButton.ZIndex = 1104
+    rainbowButton.Parent = rainbowToggle
+    
+    -- Rainbow toggle interaction
+    rainbowButton.MouseButton1Click:Connect(function()
+        colorPicker.rainbow = not colorPicker.rainbow
+        
+        -- Update button
+        rainbowButton.BackgroundColor3 = colorPicker.rainbow and 
+            ZyncLib.Constants.HIGHLIGHT_COLOR or 
+            Color3.fromRGB(60, 60, 60)
+        rainbowButton.Text = colorPicker.rainbow and "ON" or "OFF"
+        
+        -- Toggle rainbow effect
+        colorPicker:ToggleRainbow()
+        
+        self:PlaySound("click")
+    end)
+    
+    -- Create color presets
+    local presetsContainer = Instance.new("Frame")
+    presetsContainer.Name = "PresetsContainer"
+    presetsContainer.BackgroundTransparency = 1
+    presetsContainer.Position = UDim2.new(0, 10, 0, 215)
+    presetsContainer.Size = UDim2.new(0, 180, 0, 50)
+    presetsContainer.ZIndex = 1103
+    presetsContainer.Parent = self.colorPickerContainer
+    
+    -- Presets title
+    local presetsTitle = Instance.new("TextLabel")
+    presetsTitle.Name = "PresetsTitle"
+    presetsTitle.BackgroundTransparency = 1
+    presetsTitle.Position = UDim2.new(0, 0, 0, 0)
+    presetsTitle.Size = UDim2.new(1, 0, 0, 15)
+    presetsTitle.Font = Enum.Font.RobotoMono
+    presetsTitle.Text = "Presets"
+    presetsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    presetsTitle.TextSize = 14
+    presetsTitle.TextXAlignment = Enum.TextXAlignment.Left
+    presetsTitle.ZIndex = 1104
+    presetsTitle.Parent = presetsContainer
+    
+    -- Create preset buttons
+    local presetSize = 20
+    local spacing = 5
+    local padding = 5
+    local presetsPerRow = math.floor((180 - padding) / (presetSize + spacing))
+    
+    for i, preset in ipairs(colorPicker.presets) do
+        local row = math.floor((i - 1) / presetsPerRow)
+        local col = (i - 1) % presetsPerRow
+        
+        local presetButton = Instance.new("TextButton")
+        presetButton.Name = "Preset_" .. i
+        presetButton.BackgroundColor3 = preset.color
+        presetButton.BorderSizePixel = 1
+        presetButton.BorderColor3 = Color3.fromRGB(100, 100, 100)
+        presetButton.Position = UDim2.new(0, padding + col * (presetSize + spacing), 0, 20 + row * (presetSize + spacing))
+        presetButton.Size = UDim2.new(0, presetSize, 0, presetSize)
+        presetButton.Text = ""
+        presetButton.ZIndex = 1104
+        presetButton.Parent = presetsContainer
+        
+        -- Preset tooltip
+        local tooltip = Instance.new("TextLabel")
+        tooltip.Name = "Tooltip"
+        tooltip.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        tooltip.BackgroundTransparency = 0.2
+        tooltip.BorderSizePixel = 1
+        tooltip.Position = UDim2.new(0, 0, 0, -25)
+        tooltip.Size = UDim2.new(0, 0, 0, 20) -- Will be resized based on text
+        tooltip.Font = Enum.Font.RobotoMono
+        tooltip.Text = preset.name
+        tooltip.TextColor3 = Color3.fromRGB(255, 255, 255)
+        tooltip.TextSize = 12
+        tooltip.Visible = false
+        tooltip.ZIndex = 1105
+        tooltip.Parent = presetButton
+        
+        -- Resize tooltip based on text
+        local textBounds = game:GetService("TextService"):GetTextSize(
+            preset.name, 
+            12, 
+            Enum.Font.RobotoMono, 
+            Vector2.new(math.huge, 20)
+        )
+        tooltip.Size = UDim2.new(0, textBounds.X + 10, 0, 20)
+        
+        -- Show tooltip on hover
+        presetButton.MouseEnter:Connect(function()
+            tooltip.Visible = true
+        end)
+        
+        presetButton.MouseLeave:Connect(function()
+            tooltip.Visible = false
+        end)
+        
+        -- Preset selection
+        presetButton.MouseButton1Click:Connect(function()
+            -- Update color
+            r, g, b = preset.color.R * 255, preset.color.G * 255, preset.color.B * 255
+            
+            -- Update color display
+            colorDisplay.BackgroundColor3 = preset.color
+            
+            -- Update RGB sliders
+            for _, child in pairs(sliderContainer:GetChildren()) do
+                if child.Name == "RSlider" then
+                    child.SliderBg.SliderFill.Size = UDim2.new(r / 255, 0, 1, 0)
+                    child.ValueDisplay.Text = tostring(math.floor(r))
+                elseif child.Name == "GSlider" then
+                    child.SliderBg.SliderFill.Size = UDim2.new(g / 255, 0, 1, 0)
+                    child.ValueDisplay.Text = tostring(math.floor(g))
+                elseif child.Name == "BSlider" then
+                    child.SliderBg.SliderFill.Size = UDim2.new(b / 255, 0, 1, 0)
+                    child.ValueDisplay.Text = tostring(math.floor(b))
+                end
+            end
+            
+            self:PlaySound("click")
+        end)
+    end
+    
+    -- Create apply button
+    local applyButton = Instance.new("TextButton")
+    applyButton.Name = "ApplyButton"
+    applyButton.BackgroundColor3 = ZyncLib.Constants.HIGHLIGHT_COLOR
+    applyButton.BorderSizePixel = 0
+    applyButton.Position = UDim2.new(0, 10, 0, 270)
+    applyButton.Size = UDim2.new(0, 180, 0, 25)
+    applyButton.Font = Enum.Font.RobotoMono
+    applyButton.Text = "Apply"
+    applyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    applyButton.TextSize = 14
+    applyButton.ZIndex = 1103
+    applyButton.Parent = self.colorPickerContainer
+    
+    -- Apply button interaction
+    applyButton.MouseButton1Click:Connect(function()
+        -- Get color and transparency
+        local color = Color3.fromRGB(r, g, b)
+        local transparency = 0
+        
+        -- Calculate transparency from slider
+        local transSlider = transparencySlider.TransBg.TransFill
+        transparency = 1 - (transSlider.Size.X.Scale or 0)
+        
+        -- Set color
+        colorPicker:SetColor(color, transparency)
+        
+        -- Close color picker
+        self.colorPickerContainer.Visible = false
+        self.state.colorPickerOpen = false
+        self.state.currentColorPicker = nil
+        
+        self:PlaySound("click")
+    end)
+    
+    -- Set size and position
+    self.colorPickerContainer.Size = UDim2.new(0, 200, 0, 305)
+    self.colorPickerContainer.Position = position or UDim2.new(0.5, -100, 0.5, -150)
+    self.colorPickerContainer.Visible = true
+    self.state.colorPickerOpen = true
+    self.state.currentColorPicker = colorPicker
+end
+
 -- Render the UI
 function ZyncLib:Render()
     -- Clear menu container
     for _, child in pairs(self.menuContainer:GetChildren()) do
         child:Destroy()
     end
+    
+    -- Reset menu items
+    self.menuItems = {}
     
     -- Handle minimized state
     if self.state.minimized then
@@ -1226,6 +2548,13 @@ function ZyncLib:Render()
             end
         end)
         
+        -- Add to menu items
+        table.insert(self.menuItems, {
+            type = "tab",
+            tabIndex = tabIndex,
+            instance = tabFrame
+        })
+        
         yOffset = yOffset + 20
         
         -- Add options if tab is expanded
@@ -1300,6 +2629,44 @@ function ZyncLib:Render()
                     buttonIndicator.TextSize = 14
                     buttonIndicator.TextXAlignment = Enum.TextXAlignment.Left
                     buttonIndicator.Parent = optionFrame
+                elseif option.type == "multiDropdown" then
+                    local multiValue = Instance.new("TextLabel")
+                    multiValue.Name = "MultiValue"
+                    multiValue.BackgroundTransparency = 1
+                    multiValue.Position = UDim2.new(0.5, 0, 0, 0)
+                    multiValue.Size = UDim2.new(0.3, 0, 1, 0)
+                    multiValue.Font = Enum.Font.RobotoMono
+                    multiValue.Text = option.displayFormat(option.selected)
+                    multiValue.ZIndex = 1001
+                    
+                    if isSelected then
+                        multiValue.TextColor3 = ZyncLib.Constants.HIGHLIGHT_COLOR
+                    else
+                        multiValue.TextColor3 = ZyncLib.Constants.UNSELECTED_COLOR
+                    end
+                    
+                    multiValue.TextSize = 14
+                    multiValue.TextXAlignment = Enum.TextXAlignment.Left
+                    multiValue.Parent = optionFrame
+                elseif option.type == "nestedDropdown" then
+                    local nestedValue = Instance.new("TextLabel")
+                    nestedValue.Name = "NestedValue"
+                    nestedValue.BackgroundTransparency = 1
+                    nestedValue.Position = UDim2.new(0.5, 0, 0, 0)
+                    nestedValue.Size = UDim2.new(0.3, 0, 1, 0)
+                    nestedValue.Font = Enum.Font.RobotoMono
+                    nestedValue.Text = option:GetDisplayText()
+                    nestedValue.ZIndex = 1001
+                    
+                    if isSelected then
+                        nestedValue.TextColor3 = ZyncLib.Constants.HIGHLIGHT_COLOR
+                    else
+                        nestedValue.TextColor3 = ZyncLib.Constants.UNSELECTED_COLOR
+                    end
+                    
+                    nestedValue.TextSize = 14
+                    nestedValue.TextXAlignment = Enum.TextXAlignment.Left
+                    nestedValue.Parent = optionFrame
                 elseif option.type == "slider" then
                     local sliderValue = Instance.new("TextLabel")
                     sliderValue.Name = "SliderValue"
@@ -1319,25 +2686,18 @@ function ZyncLib:Render()
                     sliderValue.TextSize = 14
                     sliderValue.TextXAlignment = Enum.TextXAlignment.Left
                     sliderValue.Parent = optionFrame
-                elseif option.type == "keybind" then
-                    local keybindValue = Instance.new("TextLabel")
-                    keybindValue.Name = "KeybindValue"
-                    keybindValue.BackgroundTransparency = 1
-                    keybindValue.Position = UDim2.new(0.5, 0, 0, 0)
-                    keybindValue.Size = UDim2.new(0.3, 0, 1, 0)
-                    keybindValue.Font = Enum.Font.RobotoMono
-                    keybindValue.Text = option.value
-                    keybindValue.ZIndex = 1001
-                    
-                    if isSelected then
-                        keybindValue.TextColor3 = ZyncLib.Constants.HIGHLIGHT_COLOR
-                    else
-                        keybindValue.TextColor3 = ZyncLib.Constants.UNSELECTED_COLOR
-                    end
-                    
-                    keybindValue.TextSize = 14
-                    keybindValue.TextXAlignment = Enum.TextXAlignment.Left
-                    keybindValue.Parent = optionFrame
+                elseif option.type == "colorPicker" then
+                    -- Create color preview
+                    local colorPreview = Instance.new("Frame")
+                    colorPreview.Name = "ColorPreview"
+                    colorPreview.BackgroundColor3 = option.value
+                    colorPreview.BackgroundTransparency = option.transparency
+                    colorPreview.BorderSizePixel = 1
+                    colorPreview.BorderColor3 = Color3.fromRGB(100, 100, 100)
+                    colorPreview.Position = UDim2.new(0.5, 0, 0.5, -7)
+                    colorPreview.Size = UDim2.new(0, 40, 0, 14)
+                    colorPreview.ZIndex = 1001
+                    colorPreview.Parent = optionFrame
                 end
                 
                 -- Add keybind indicator if a keybind is set
@@ -1368,13 +2728,19 @@ function ZyncLib:Render()
                         self.state.selectedTab = tabIndex
                         self.state.selectedOption = optionIndex
                         
-                        -- Handle option by type
+                        -- Handle different option types
                         if option.type == "toggle" or option.type == "dropdown" then
                             option:Cycle()
                         elseif option.type == "button" then
                             option:Click()
+                        elseif option.type == "multiDropdown" then
+                            option:OpenMenu(UDim2.new(0, optionFrame.AbsolutePosition.X + optionFrame.AbsoluteSize.X, 0, optionFrame.AbsolutePosition.Y))
+                        elseif option.type == "nestedDropdown" then
+                            option:OpenMenu(UDim2.new(0, optionFrame.AbsolutePosition.X + optionFrame.AbsoluteSize.X, 0, optionFrame.AbsolutePosition.Y))
                         elseif option.type == "slider" then
                             option:Increment()
+                        elseif option.type == "colorPicker" then
+                            option:OpenPicker(UDim2.new(0, optionFrame.AbsolutePosition.X + optionFrame.AbsoluteSize.X, 0, optionFrame.AbsolutePosition.Y))
                         end
                     elseif input.UserInputType == Enum.UserInputType.MouseButton2 and option.keybind ~= nil then
                         self.state.selectedTab = tabIndex
@@ -1392,6 +2758,15 @@ function ZyncLib:Render()
                     end
                 end)
                 
+                -- Add to menu items
+                table.insert(self.menuItems, {
+                    type = "option",
+                    tabIndex = tabIndex,
+                    optionIndex = optionIndex,
+                    option = option,
+                    instance = optionFrame
+                })
+                
                 yOffset = yOffset + 20
             end
         end
@@ -1403,12 +2778,6 @@ function ZyncLib:Render()
         self.mainFrame.Size = UDim2.new(0, self.width, 0, newHeight)
         self.glowContainer.Size = UDim2.new(0, self.width + 8, 0, newHeight + 8)
     end
-end
-
--- Simple helper to print error and return nil
-local function errorReturn(msg)
-    warn("ZyncLib Error: " .. msg)
-    return nil
 end
 
 -- Return the library
