@@ -1,0 +1,241 @@
+local LOGO_ASSET_ID = "rbxassetid://128694280197041"
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "WatermarkBar"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.DisplayOrder = 999 -- Ensure it appears above other GUIs
+ScreenGui.IgnoreGuiInset = true
+
+local parent = game:GetService("RunService"):IsStudio() and game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui") or game:GetService("CoreGui")
+ScreenGui.Parent = parent
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainBar"
+MainFrame.Size = UDim2.new(1, 0, 0, 35) -- Slightly taller for modern look
+MainFrame.Position = UDim2.new(0, 0, 1, -35) -- Position at bottom of screen
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 22) -- Darker, more modern background
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+local UIGradient = Instance.new("UIGradient")
+UIGradient.Rotation = 90
+UIGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(35, 35, 40)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(28, 28, 33)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(23, 23, 28))
+})
+UIGradient.Parent = MainFrame
+
+local AccentLine = Instance.new("Frame")
+AccentLine.Name = "AccentLine"
+AccentLine.Size = UDim2.new(1, 0, 0, 1)
+AccentLine.Position = UDim2.new(0, 0, 0, 0)
+AccentLine.BackgroundColor3 = Color3.fromRGB(25, 25, 27) -- Subtle dark accent
+AccentLine.BorderSizePixel = 0
+AccentLine.ZIndex = 10
+AccentLine.Parent = MainFrame
+
+local LeftSection = Instance.new("Frame")
+LeftSection.Name = "LeftSection"
+LeftSection.Size = UDim2.new(0.33, 0, 1, 0)
+LeftSection.Position = UDim2.new(0, 0, 0, 0)
+LeftSection.BackgroundTransparency = 1
+LeftSection.Parent = MainFrame
+
+local LogoContainer = Instance.new("Frame")
+LogoContainer.Name = "LogoContainer"
+LogoContainer.Size = UDim2.new(0, 50, 0, 50)
+LogoContainer.Position = UDim2.new(0, -8, 0.5, -24)
+LogoContainer.BackgroundTransparency = 1
+LogoContainer.ZIndex = 5
+LogoContainer.Parent = LeftSection
+
+local Logo = Instance.new("ImageLabel")
+Logo.Name = "Logo"
+Logo.Size = UDim2.new(1, 0, 1, 0)
+Logo.BackgroundTransparency = 1
+Logo.Image = LOGO_ASSET_ID
+Logo.ZIndex = 5
+Logo.Parent = LogoContainer
+
+local LogoGlow = Instance.new("ImageLabel")
+LogoGlow.Name = "LogoGlow"
+LogoGlow.Size = UDim2.new(1.5, 0, 1.5, 0)
+LogoGlow.Position = UDim2.new(-0.25, 0, -0.25, 0)
+LogoGlow.BackgroundTransparency = 1
+LogoGlow.Image = "rbxassetid://131459085" -- Glow asset
+LogoGlow.ImageColor3 = Color3.fromRGB(0, 119, 255)
+LogoGlow.ImageTransparency = 0.85
+LogoGlow.ZIndex = 4
+LogoGlow.Parent = LogoContainer
+
+local BrandText = Instance.new("TextLabel")
+BrandText.Name = "BrandText"
+BrandText.Size = UDim2.new(0, 110, 1, 0)
+BrandText.Position = UDim2.new(0, 40, 0, 0)
+BrandText.BackgroundTransparency = 1
+BrandText.Font = Enum.Font.SourceSansBold
+BrandText.Text = "Zync.pmo"
+BrandText.TextColor3 = Color3.fromRGB(255, 255, 255)
+BrandText.TextSize = 16
+BrandText.TextXAlignment = Enum.TextXAlignment.Left
+BrandText.ZIndex = 5
+BrandText.Parent = LeftSection
+
+local BrandTextAccent = Instance.new("Frame")
+BrandTextAccent.Name = "BrandTextAccent"
+BrandTextAccent.Size = UDim2.new(0, 60, 0, 1.9)
+BrandTextAccent.Position = UDim2.new(0, 40, 0.78, 0)
+BrandTextAccent.BackgroundColor3 = Color3.fromRGB(81, 81, 189)
+BrandTextAccent.BorderSizePixel = 0
+BrandTextAccent.ZIndex = 5
+BrandTextAccent.Parent = LeftSection
+
+local MiddleSection = Instance.new("Frame")
+MiddleSection.Name = "MiddleSection"
+MiddleSection.Size = UDim2.new(0.34, 0, 1, 0)
+MiddleSection.Position = UDim2.new(0.33, 0, 0, 0)
+MiddleSection.BackgroundTransparency = 1
+MiddleSection.Parent = MainFrame
+
+local CreditsText = Instance.new("TextLabel")
+CreditsText.Name = "CreditsText"
+CreditsText.Size = UDim2.new(1, 0, 1, 0)
+CreditsText.BackgroundTransparency = 1
+CreditsText.Font = Enum.Font.SourceSansBold
+CreditsText.Text = "Made With ❤️ Made By: Za1k"
+CreditsText.TextColor3 = Color3.fromRGB(255, 255, 255)
+CreditsText.TextSize = 16
+CreditsText.ZIndex = 5
+CreditsText.Parent = MiddleSection
+
+local RightSection = Instance.new("Frame")
+RightSection.Name = "RightSection"
+RightSection.Size = UDim2.new(0.33, 0, 1, 0)
+RightSection.Position = UDim2.new(0.67, 0, 0, 0)
+RightSection.BackgroundTransparency = 1
+RightSection.Parent = MainFrame
+
+local TimeText = Instance.new("TextLabel")
+TimeText.Name = "TimeText"
+TimeText.Size = UDim2.new(1, -20, 1, 0)
+TimeText.Position = UDim2.new(0, 0, 0, 0)
+TimeText.BackgroundTransparency = 1
+TimeText.Font = Enum.Font.SourceSansBold
+TimeText.Text = "00:00:00"
+TimeText.TextColor3 = Color3.fromRGB(180, 180, 180)
+TimeText.TextSize = 16
+TimeText.TextXAlignment = Enum.TextXAlignment.Right
+TimeText.ZIndex = 5
+TimeText.Parent = RightSection
+
+local Shadow = Instance.new("ImageLabel")
+Shadow.Name = "Shadow"
+Shadow.Size = UDim2.new(1, 0, 0, 15)
+Shadow.Position = UDim2.new(0, 0, 0, -15)
+Shadow.BackgroundTransparency = 1
+Shadow.Image = "rbxassetid://131459085"
+Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+Shadow.ImageTransparency = 0.4
+Shadow.ZIndex = 3
+Shadow.Parent = MainFrame
+
+local function animateBrandUnderline()
+    spawn(function()
+        while true do
+            for i = 0, 1, 0.02 do
+                local color = Color3.fromRGB(
+                    81 + ((255 - 81) * i),
+                    81 + ((255 - 81) * i),
+                    189 + ((255 - 189) * i)
+                )
+                BrandTextAccent.BackgroundColor3 = color
+                wait(0.05)
+            end
+            
+            wait(1)
+            
+            for i = 0, 1, 0.02 do
+                local color = Color3.fromRGB(
+                    255 - ((255 - 81) * i),
+                    255 - ((255 - 81) * i),
+                    255 - ((255 - 189) * i)
+                )
+                BrandTextAccent.BackgroundColor3 = color
+                wait(0.05)
+            end
+            
+            wait(1)
+        end
+    end)
+end
+
+local currentTimeDisplay = "00:00:00"
+local function updateTime()
+    local date = os.date("*t")
+    local hour = date.hour
+    local min = date.min
+    local sec = date.sec
+    
+    local timeString = string.format("%02d:%02d:%02d", hour, min, sec)
+    
+    if timeString ~= currentTimeDisplay then
+        currentTimeDisplay = timeString
+        
+        spawn(function()
+            for i = 0, 0.5, 0.1 do
+                TimeText.TextTransparency = i
+                wait(0.01)
+            end
+            
+            TimeText.Text = timeString
+            
+            for i = 0.5, 0, -0.1 do
+                TimeText.TextTransparency = i
+                wait(0.01)
+            end
+        end)
+    end
+end
+
+local function startupAnimation()
+    MainFrame.Position = UDim2.new(0, 0, 1, 5)
+    MainFrame.BackgroundTransparency = 1
+    Logo.ImageTransparency = 1
+    BrandText.TextTransparency = 1
+    CreditsText.TextTransparency = 1
+    TimeText.TextTransparency = 1
+    AccentLine.BackgroundTransparency = 1
+    BrandTextAccent.BackgroundTransparency = 1
+    
+    spawn(function()
+        for i = 1, 0, -0.05 do
+            MainFrame.Position = UDim2.new(0, 0, 1, 5 - (40 * (1-i)))
+            MainFrame.BackgroundTransparency = i
+            AccentLine.BackgroundTransparency = i
+            wait(0.01)
+        end
+        
+        for i = 1, 0, -0.1 do
+            Logo.ImageTransparency = i
+            BrandText.TextTransparency = i
+            CreditsText.TextTransparency = i
+            TimeText.TextTransparency = i
+            BrandTextAccent.BackgroundTransparency = i
+            wait(0.02)
+        end
+        
+        animateBrandUnderline()
+    end)
+end
+
+spawn(function()
+    while true do
+        updateTime()
+        wait(1)
+    end
+end)
+
+startupAnimation()
+
+-- let me freee
